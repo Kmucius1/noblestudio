@@ -3,14 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 
 const VIDEO_GOALS = [
   { value: "mortgage_education", label: "Mortgage Education" },
   { value: "funny_tiktok", label: "Funny TikTok" },
   { value: "luxury_ad", label: "Luxury Ad" },
-  { value: "website_hero", label: "Website Hero Video" },
-  { value: "loan_explainer", label: "Loan Product Explainer" },
-  { value: "holiday_social", label: "Holiday / Social Post" },
+  { value: "website_hero", label: "Website Hero" },
+  { value: "loan_explainer", label: "Loan Explainer" },
+  { value: "holiday_social", label: "Holiday / Social" },
   { value: "client_followup", label: "Client Follow-Up" },
   { value: "rsm_training", label: "RSM Training" },
 ];
@@ -30,18 +31,18 @@ const TONES = [
   { value: "educational", label: "Educational" },
   { value: "bold", label: "Bold" },
   { value: "warm", label: "Warm" },
-  { value: "cartoon_cinematic", label: "Cartoon Cinematic" },
+  { value: "cartoon_cinematic", label: "Cinematic" },
 ];
 
 const LOCATIONS = [
   { value: "luxury_office", label: "Luxury Office" },
   { value: "mortgage_desk", label: "Mortgage Desk" },
   { value: "tampa_skyline", label: "Tampa Skyline" },
-  { value: "kitchen_remodel", label: "High-End Kitchen Remodel Home" },
+  { value: "kitchen_remodel", label: "High-End Home" },
   { value: "bank_vault", label: "Bank Vault" },
   { value: "white_studio", label: "White Studio" },
-  { value: "closing_table", label: "Real Estate Closing Table" },
-  { value: "dream_home_driveway", label: "Dream Home Driveway" },
+  { value: "closing_table", label: "Closing Table" },
+  { value: "dream_home_driveway", label: "Dream Home" },
 ];
 
 const CTAS = [
@@ -52,10 +53,30 @@ const CTAS = [
   { value: "visit_ehm", label: "Visit EHM Strategies" },
 ];
 
+const card = { background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "24px" };
+const label = { color: "#c9a227", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase" as const, fontFamily: "'Inter', sans-serif", marginBottom: 12, display: "block" };
+
+function OptionBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="px-4 py-2.5 rounded-xl text-sm font-medium text-left transition-all w-full"
+      style={{
+        background: active ? "rgba(201,162,39,0.12)" : "#111f3a",
+        border: `1px solid ${active ? "#c9a227" : "rgba(255,255,255,0.06)"}`,
+        color: active ? "#e4b93a" : "rgba(255,255,255,0.4)",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function CreateVideoPage() {
   const router = useRouter();
   const supabase = createClient();
-
   const [form, setForm] = useState({
     goal: "mortgage_education",
     platform: "tiktok_reels_shorts",
@@ -66,12 +87,11 @@ export default function CreateVideoPage() {
     cta: "apply_now",
     custom_prompt: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<"form" | "generating">("form");
+  const [generating, setGenerating] = useState(false);
 
-  function updateForm(key: string, value: string | number) {
+  function set(key: string, value: string | number) {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "platform") {
@@ -86,13 +106,12 @@ export default function CreateVideoPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setStep("generating");
+    setGenerating(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // 1. Create project
       const projectRes = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,7 +120,6 @@ export default function CreateVideoPage() {
       const project = await projectRes.json();
       if (!projectRes.ok) throw new Error(project.error);
 
-      // 2. Generate script + scenes
       const scriptRes = await fetch("/api/noble/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,185 +131,136 @@ export default function CreateVideoPage() {
       router.push(`/projects/${project.id}/storyboard`);
     } catch (err) {
       setError(String(err));
-      setStep("form");
+      setGenerating(false);
       setLoading(false);
     }
   }
 
-  if (step === "generating") {
+  if (generating) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
+      <div className="min-h-screen flex items-center justify-center p-8" style={{ background: "#080f1e" }}>
         <div className="text-center">
-          <div className="text-6xl mb-6 animate-pulse">🐂</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Noble is writing your script...</h2>
-          <p style={{ color: "#8899aa" }}>Creating your {form.duration_seconds}s {form.tone} video</p>
-          <div className="mt-8 flex justify-center gap-2">
+          <div className="relative w-28 h-28 mx-auto mb-6 rounded-full overflow-hidden animate-pulse" style={{ boxShadow: "0 0 40px rgba(201,162,39,0.4)", outline: "2px solid rgba(201,162,39,0.5)" }}>
+            <Image src="/noble-badge.jpg" alt="Noble" fill className="object-cover" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Noble is writing your script...
+          </h2>
+          <p className="text-sm mb-8" style={{ color: "rgba(255,255,255,0.4)", fontFamily: "'Inter', sans-serif" }}>
+            Creating your {form.duration_seconds}s {form.tone} video for {form.platform.replace(/_/g, " ")}
+          </p>
+          <div className="flex justify-center gap-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="w-2 h-2 rounded-full animate-bounce" style={{ background: "#c9a227", animationDelay: `${i * 0.15}s` }} />
+              <div key={i} className="w-2 h-2 rounded-full" style={{ background: "#c9a227", animation: `bounce 1.2s ease-in-out ${i * 0.15}s infinite` }} />
             ))}
           </div>
+          <p className="text-xs mt-6" style={{ color: "rgba(201,162,39,0.5)", fontFamily: "'Inter', sans-serif" }}>
+            "No Bull. Just Strategy."
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Create New Noble Video</h1>
-        <p style={{ color: "#8899aa" }}>Fill out your video brief. Noble writes the script and builds your storyboard.</p>
+    <div className="min-h-screen" style={{ background: "#080f1e" }}>
+      {/* Header */}
+      <div className="px-8 pt-8 pb-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <p className="text-xs tracking-widest uppercase mb-1" style={{ color: "#c9a227", fontFamily: "'Inter', sans-serif" }}>Noble Studio</p>
+        <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Create New Video</h1>
+        <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
+          Fill out your brief — Noble writes the script and builds your storyboard.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="px-8 py-6 max-w-4xl space-y-5">
+
         {/* Goal */}
-        <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-          <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>VIDEO GOAL</h3>
-          <div className="grid grid-cols-2 gap-2">
+        <div style={card}>
+          <span style={label}>Video Goal</span>
+          <div className="grid grid-cols-4 gap-2">
             {VIDEO_GOALS.map((g) => (
-              <button
-                key={g.value}
-                type="button"
-                onClick={() => updateForm("goal", g.value)}
-                className="px-4 py-3 rounded-xl text-sm font-medium text-left transition-all"
-                style={{
-                  background: form.goal === g.value ? "rgba(201,162,39,0.15)" : "#132040",
-                  border: `1px solid ${form.goal === g.value ? "#c9a227" : "#1a2d52"}`,
-                  color: form.goal === g.value ? "#c9a227" : "#8899aa",
-                }}
-              >
+              <OptionBtn key={g.value} active={form.goal === g.value} onClick={() => set("goal", g.value)}>
                 {g.label}
-              </button>
+              </OptionBtn>
             ))}
           </div>
         </div>
 
-        {/* Platform + Length */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-            <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>PLATFORM</h3>
+        {/* Platform + Length + Tone */}
+        <div className="grid grid-cols-3 gap-5">
+          <div style={card}>
+            <span style={label}>Platform</span>
             <div className="space-y-2">
               {PLATFORMS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => updateForm("platform", p.value)}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-left transition-all"
-                  style={{
-                    background: form.platform === p.value ? "rgba(201,162,39,0.15)" : "#132040",
-                    border: `1px solid ${form.platform === p.value ? "#c9a227" : "#1a2d52"}`,
-                    color: form.platform === p.value ? "#c9a227" : "#8899aa",
-                  }}
-                >
+                <OptionBtn key={p.value} active={form.platform === p.value} onClick={() => set("platform", p.value)}>
                   <span>{p.label}</span>
-                  <span className="ml-2 text-xs opacity-60">{p.ratio}</span>
-                </button>
+                  <span className="ml-1 opacity-50 text-xs">{p.ratio}</span>
+                </OptionBtn>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-            <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>LENGTH</h3>
-            <div className="grid grid-cols-2 gap-2">
+          <div style={card}>
+            <span style={label}>Length</span>
+            <div className="grid grid-cols-2 gap-2 mb-5">
               {LENGTHS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => updateForm("duration_seconds", l)}
-                  className="py-3 rounded-xl text-sm font-medium transition-all"
-                  style={{
-                    background: form.duration_seconds === l ? "rgba(201,162,39,0.15)" : "#132040",
-                    border: `1px solid ${form.duration_seconds === l ? "#c9a227" : "#1a2d52"}`,
-                    color: form.duration_seconds === l ? "#c9a227" : "#8899aa",
-                  }}
-                >
+                <OptionBtn key={l} active={form.duration_seconds === l} onClick={() => set("duration_seconds", l)}>
                   {l}s
-                </button>
+                </OptionBtn>
               ))}
             </div>
-
-            <h3 className="text-sm font-semibold mb-4 mt-6" style={{ color: "#c9a227" }}>TONE</h3>
+            <span style={label}>Tone</span>
             <div className="grid grid-cols-2 gap-2">
               {TONES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => updateForm("tone", t.value)}
-                  className="py-2.5 rounded-xl text-xs font-medium transition-all"
-                  style={{
-                    background: form.tone === t.value ? "rgba(201,162,39,0.15)" : "#132040",
-                    border: `1px solid ${form.tone === t.value ? "#c9a227" : "#1a2d52"}`,
-                    color: form.tone === t.value ? "#c9a227" : "#8899aa",
-                  }}
-                >
+                <OptionBtn key={t.value} active={form.tone === t.value} onClick={() => set("tone", t.value)}>
                   {t.label}
-                </button>
+                </OptionBtn>
+              ))}
+            </div>
+          </div>
+
+          <div style={card}>
+            <span style={label}>Call to Action</span>
+            <div className="space-y-2">
+              {CTAS.map((c) => (
+                <OptionBtn key={c.value} active={form.cta === c.value} onClick={() => set("cta", c.value)}>
+                  {c.label}
+                </OptionBtn>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Location + CTA */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-            <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>NOBLE LOCATION</h3>
-            <div className="space-y-2">
-              {LOCATIONS.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => updateForm("location", l.value)}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-left transition-all"
-                  style={{
-                    background: form.location === l.value ? "rgba(201,162,39,0.15)" : "#132040",
-                    border: `1px solid ${form.location === l.value ? "#c9a227" : "#1a2d52"}`,
-                    color: form.location === l.value ? "#c9a227" : "#8899aa",
-                  }}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-            <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>CALL TO ACTION</h3>
-            <div className="space-y-2">
-              {CTAS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => updateForm("cta", c.value)}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-left transition-all"
-                  style={{
-                    background: form.cta === c.value ? "rgba(201,162,39,0.15)" : "#132040",
-                    border: `1px solid ${form.cta === c.value ? "#c9a227" : "#1a2d52"}`,
-                    color: form.cta === c.value ? "#c9a227" : "#8899aa",
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+        {/* Location */}
+        <div style={card}>
+          <span style={label}>Noble's Location</span>
+          <div className="grid grid-cols-4 gap-2">
+            {LOCATIONS.map((l) => (
+              <OptionBtn key={l.value} active={form.location === l.value} onClick={() => set("location", l.value)}>
+                {l.label}
+              </OptionBtn>
+            ))}
           </div>
         </div>
 
         {/* Custom Prompt */}
-        <div className="rounded-2xl p-6" style={{ background: "#0e1c33" }}>
-          <h3 className="text-sm font-semibold mb-4" style={{ color: "#c9a227" }}>CUSTOM PROMPT (OPTIONAL)</h3>
+        <div style={card}>
+          <span style={label}>Custom Direction (optional)</span>
           <textarea
             value={form.custom_prompt}
-            onChange={(e) => updateForm("custom_prompt", e.target.value)}
+            onChange={(e) => set("custom_prompt", e.target.value)}
             rows={3}
-            placeholder="e.g. Noble is standing in a luxury Tampa condo explaining why now is the best time to refinance..."
-            className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-gray-600 outline-none border resize-none transition-colors"
-            style={{ background: "#132040", borderColor: "#1a2d52" }}
-            onFocus={(e) => (e.target.style.borderColor = "#c9a227")}
-            onBlur={(e) => (e.target.style.borderColor = "#1a2d52")}
+            placeholder="e.g. Noble stands in a luxury Tampa condo explaining why now is the best time to refinance your investment property..."
+            className="w-full px-4 py-3 rounded-xl text-sm text-white resize-none outline-none transition-all"
+            style={{ background: "#111f3a", border: "1px solid rgba(255,255,255,0.06)", fontFamily: "'Inter', sans-serif", color: "rgba(255,255,255,0.8)" }}
+            onFocus={(e) => (e.target.style.borderColor = "rgba(201,162,39,0.5)")}
+            onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.06)")}
           />
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <div className="p-4 rounded-xl text-sm" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontFamily: "'Inter', sans-serif" }}>
             {error}
           </div>
         )}
@@ -299,10 +268,16 @@ export default function CreateVideoPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 rounded-2xl font-bold text-base transition-opacity disabled:opacity-60"
-          style={{ background: "linear-gradient(135deg, #c9a227, #e8c547)", color: "#0a1628" }}
+          className="w-full py-4 rounded-2xl font-bold text-sm tracking-widest uppercase disabled:opacity-50 transition-all"
+          style={{
+            background: "linear-gradient(135deg, #a07820, #c9a227, #e4b93a)",
+            color: "#080f1e",
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: "0.1em",
+            boxShadow: "0 4px 20px rgba(201,162,39,0.35)",
+          }}
         >
-          Generate Script + Storyboard →
+          Generate Noble Script + Storyboard →
         </button>
       </form>
     </div>

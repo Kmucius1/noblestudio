@@ -1,88 +1,112 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import Image from "next/image";
 
-const statusColors: Record<string, string> = {
-  draft: "#8899aa",
-  scripted: "#c9a227",
-  storyboarded: "#40916c",
-  rendered: "#2d6a4f",
-  exported: "#e8c547",
+const statusColors: Record<string, { text: string; bg: string }> = {
+  draft:        { text: "rgba(255,255,255,0.4)", bg: "rgba(255,255,255,0.05)" },
+  scripted:     { text: "#c9a227",               bg: "rgba(201,162,39,0.1)" },
+  storyboarded: { text: "#40916c",               bg: "rgba(64,145,108,0.1)" },
+  rendered:     { text: "#6ee7b7",               bg: "rgba(110,231,183,0.1)" },
+  exported:     { text: "#e4b93a",               bg: "rgba(228,185,58,0.12)" },
 };
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   const { data: projects } = await supabase
     .from("noble_video_projects")
-    .select("*, noble_video_scenes(count)")
-    .eq("user_id", user!.id)
+    .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen" style={{ background: "#080f1e" }}>
+      {/* Header */}
+      <div className="px-8 pt-8 pb-6 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">My Projects</h1>
-          <p style={{ color: "#8899aa" }}>{projects?.length ?? 0} Noble video projects</p>
+          <p className="text-xs tracking-widest uppercase mb-1" style={{ color: "#c9a227", fontFamily: "'Inter', sans-serif" }}>Noble Studio</p>
+          <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>My Projects</h1>
+          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
+            {projects?.length ?? 0} Noble video projects
+          </p>
         </div>
         <Link
           href="/create"
-          className="px-5 py-2.5 rounded-xl text-sm font-semibold"
-          style={{ background: "linear-gradient(135deg, #c9a227, #e8c547)", color: "#0a1628" }}
+          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold tracking-wide"
+          style={{ background: "linear-gradient(135deg, #a07820, #c9a227, #e4b93a)", color: "#080f1e", fontFamily: "'Inter', sans-serif", boxShadow: "0 4px 16px rgba(201,162,39,0.3)" }}
         >
-          + Create New
+          ✦ Create New
         </Link>
       </div>
 
-      {projects && projects.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}/storyboard`}
-              className="block rounded-2xl p-5 card-glow transition-all"
-              style={{ background: "#0e1c33" }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0 mr-3">
-                  <h3 className="font-semibold text-white truncate">{project.title || "Untitled Project"}</h3>
-                  <p className="text-xs mt-0.5" style={{ color: "#8899aa" }}>
-                    {project.platform?.replace(/_/g, " ")} · {project.duration_seconds}s
-                  </p>
-                </div>
-                <span
-                  className="text-xs px-2.5 py-1 rounded-full font-semibold shrink-0"
-                  style={{ color: statusColors[project.status] ?? "#8899aa", background: "rgba(255,255,255,0.05)" }}
+      <div className="px-8 py-6 max-w-6xl">
+        {projects && projects.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4">
+            {projects.map((project) => {
+              const s = statusColors[project.status] ?? statusColors.draft;
+              return (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}/storyboard`}
+                  className="group rounded-2xl p-5 transition-all"
+                  style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
                 >
-                  {project.status}
-                </span>
-              </div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)", border: "1px solid rgba(201,162,39,0.2)" }}>
+                        <span className="text-sm" style={{ color: "#c9a227" }}>◈</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white truncate" style={{ fontFamily: "'Inter', sans-serif" }}>
+                          {project.title || "Untitled Project"}
+                        </p>
+                        <p className="text-xs mt-0.5 capitalize" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
+                          {project.platform?.replace(/_/g, " ")} · {project.duration_seconds}s
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ml-3" style={{ color: s.text, background: s.bg, fontFamily: "'Inter', sans-serif" }}>
+                      {project.status}
+                    </span>
+                  </div>
 
-              <div className="flex items-center gap-3 text-xs" style={{ color: "#8899aa" }}>
-                <span className="capitalize">{project.tone?.replace(/_/g, " ")}</span>
-                <span>·</span>
-                <span className="capitalize">{project.goal?.replace(/_/g, " ")}</span>
-                <span>·</span>
-                <span>{project.aspect_ratio}</span>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs" style={{ color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>
+                      <span className="capitalize">{project.tone?.replace(/_/g, " ")}</span>
+                      <span>·</span>
+                      <span className="capitalize">{project.goal?.replace(/_/g, " ")}</span>
+                      <span>·</span>
+                      <span>{project.aspect_ratio}</span>
+                    </div>
+                    <span className="text-xs transition-transform group-hover:translate-x-0.5" style={{ color: "#c9a227" }}>→</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl p-16 text-center" style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="relative w-28 h-28 mx-auto mb-5 rounded-full overflow-hidden" style={{ border: "2px solid rgba(201,162,39,0.3)" }}>
+              <Image src="/noble-badge.jpg" alt="Noble" fill className="object-cover" />
+            </div>
+            <p className="text-xl font-bold text-white mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>No projects yet</p>
+            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
+              Create your first Noble video to get started
+            </p>
+            <Link
+              href="/create"
+              className="inline-block px-6 py-3 rounded-xl text-sm font-bold"
+              style={{ background: "linear-gradient(135deg, #a07820, #c9a227)", color: "#080f1e", fontFamily: "'Inter', sans-serif" }}
+            >
+              Create First Video
             </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-2xl p-16 text-center" style={{ background: "#0e1c33" }}>
-          <p className="text-5xl mb-4">🎬</p>
-          <p className="text-lg font-semibold text-white mb-2">No projects yet</p>
-          <p className="text-sm mb-6" style={{ color: "#8899aa" }}>Create your first Noble video to get started</p>
-          <Link
-            href="/create"
-            className="inline-block px-6 py-3 rounded-xl font-semibold text-sm"
-            style={{ background: "linear-gradient(135deg, #c9a227, #e8c547)", color: "#0a1628" }}
-          >
-            Create First Video
-          </Link>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
