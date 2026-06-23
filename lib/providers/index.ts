@@ -18,6 +18,7 @@ export interface VideoGenerationInput {
 export interface GenerationResult {
   url: string;
   provider: string;
+  jobId?: string;
 }
 
 export async function generateImage(
