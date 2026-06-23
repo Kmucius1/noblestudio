@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildScriptPrompt } from "@/lib/noble/prompts";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY ?? "placeholder" });
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,16 +20,16 @@ export async function POST(req: NextRequest) {
       cta: cta.replace(/_/g, " "),
     });
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
+      max_tokens: 4096,
+      temperature: 0.7,
     });
 
-    const content = message.content[0];
-    if (content.type !== "text") throw new Error("Unexpected response type");
+    const text = completion.choices[0]?.message?.content ?? "";
 
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON found in response");
 
     const generated = JSON.parse(jsonMatch[0]);

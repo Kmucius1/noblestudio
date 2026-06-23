@@ -5,18 +5,19 @@ import { createClient } from "@/lib/supabase/server";
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   const { data: projects } = await supabase
     .from("noble_video_projects")
     .select("*")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(4);
 
   const { count: totalProjects } = await supabase
     .from("noble_video_projects")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id);
+    .eq("user_id", user.id);
 
   const { count: totalExports } = await supabase
     .from("noble_exports")
