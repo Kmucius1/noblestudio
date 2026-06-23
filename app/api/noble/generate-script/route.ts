@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildScriptPrompt } from "@/lib/noble/prompts";
 
-const xai = new OpenAI({
-  apiKey: process.env.XAI_API_KEY ?? "placeholder",
-  baseURL: "https://api.x.ai/v1",
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY ?? "placeholder" });
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,8 +20,8 @@ export async function POST(req: NextRequest) {
       cta: cta.replace(/_/g, " "),
     });
 
-    const completion = await xai.chat.completions.create({
-      model: "grok-3",
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 4096,
       temperature: 0.7,
