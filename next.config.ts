@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.higgsfield.ai" },
       { protocol: "https", hostname: "*.klingai.com" },
       { protocol: "https", hostname: "*.runwayml.com" },
+      { protocol: "https", hostname: "*.fal.run" },
     ],
   },
 };
