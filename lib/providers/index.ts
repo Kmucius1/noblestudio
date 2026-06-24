@@ -19,6 +19,8 @@ export interface GenerationResult {
   url: string;
   provider: string;
   jobId?: string;
+  /** true when job was submitted but not yet complete — caller must poll */
+  queued?: boolean;
 }
 
 export async function generateImage(
@@ -56,3 +58,7 @@ export async function generateVideo(
       throw new Error(`Unknown video provider: ${provider}`);
   }
 }
+
+// Re-export Higgsfield job-status utilities used by the polling API route
+export { checkJobStatus } from "./higgsfield";
+export type { HiggsfieldJobStatus } from "./higgsfield";

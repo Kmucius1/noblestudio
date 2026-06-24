@@ -164,16 +164,18 @@ export default function CreateVideoPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "#080f1e" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "2.5rem 2.5rem" }}>
+
       {/* Header */}
-      <div className="px-8 pt-8 pb-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="mb-8 pb-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <p className="text-xs tracking-widest uppercase mb-1" style={{ color: "#c9a227", fontFamily: "'Inter', sans-serif" }}>Noble Studio</p>
-        <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Create New Video</h1>
+        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: "'Inter', sans-serif" }}>Create New Video</h1>
         <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
           Fill out your brief — Noble writes the script and builds your storyboard.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-8 py-6 max-w-4xl space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
 
         {/* Goal */}
         <div style={card}>
@@ -280,6 +282,7 @@ export default function CreateVideoPage() {
           Generate Noble Script + Storyboard →
         </button>
       </form>
+      </div>
     </div>
   );
 }

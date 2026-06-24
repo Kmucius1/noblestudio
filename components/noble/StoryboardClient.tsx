@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ProjectEditorHeader } from "./storyboard/ProjectEditorHeader";
+import { FullScriptPanel } from "./storyboard/FullScriptPanel";
+import { SceneCard } from "./storyboard/SceneCard";
 import type { NobleVideoProject, NobleVideoScene, NobleCharacterRef } from "@/types/noble";
 
 interface Props {
@@ -10,16 +12,112 @@ interface Props {
   characterRefs: NobleCharacterRef[];
 }
 
+interface SceneError {
+  type: "image" | "video" | "voice";
+  raw: string;
+}
+
+interface VideoJob {
+  jobId: string;
+  sceneId: string;
+  startedAt: number;
+}
+
+function getUIStatus(
+  scene: NobleVideoScene,
+  generating: Record<string, string>,
+  errors: Record<string, SceneError>,
+  videoJobs: VideoJob[]
+): string {
+  const gen = generating[scene.id];
+  if (gen === "image") return "image_generating";
+  if (gen === "voice") return "voice_generating";
+  if (errors[scene.id]) return "image_failed";
+  if (scene.status === "approved") return "approved";
+  if (videoJobs.some((j) => j.sceneId === scene.id)) return "video_generating";
+  if (scene.video_url) return "video_ready";
+  if (scene.image_url) return "image_ready";
+  return "pending";
+}
+
 export default function StoryboardClient({ project, initialScenes, characterRefs }: Props) {
-  const [scenes, setScenes] = useState(initialScenes);
+  const [scenes, setScenes] = useState<NobleVideoScene[]>(initialScenes);
   const [generating, setGenerating] = useState<Record<string, string>>({});
-  const [error, setError] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, SceneError>>({});
+  const [videoJobs, setVideoJobs] = useState<VideoJob[]>([]);
+  const pollTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const primaryRef = characterRefs.find((r) => r.is_primary);
 
-  async function generateImage(scene: NobleVideoScene) {
-    setGenerating((prev) => ({ ...prev, [scene.id]: "image" }));
-    setError((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+  // ── Video job polling ─────────────────────────────────────────────────────
+  const pollVideoJob = useCallback(async (job: VideoJob) => {
+    try {
+      const res = await fetch(
+        `/api/noble/job-status/${job.jobId}?scene_id=${job.sceneId}&type=video`
+      );
+      const data = await res.json();
+
+      if (data.status === "completed" && data.url) {
+        setScenes((prev) =>
+          prev.map((s) =>
+            s.id === job.sceneId ? { ...s, video_url: data.url, status: "video_generated" } : s
+          )
+        );
+        setVideoJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+        return;
+      }
+
+      if (data.status === "failed") {
+        setErrors((prev) => ({
+          ...prev,
+          [job.sceneId]: { type: "video", raw: data.error ?? "Video generation failed" },
+        }));
+        setVideoJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+        return;
+      }
+
+      // Still processing — check if we've been waiting too long (5 min)
+      if (Date.now() - job.startedAt > 5 * 60 * 1000) {
+        setErrors((prev) => ({
+          ...prev,
+          [job.sceneId]: {
+            type: "video",
+            raw: "Video generation timed out after 5 minutes. The job may still be running — try refreshing.",
+          },
+        }));
+        setVideoJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+        return;
+      }
+
+      // Schedule next poll in 6s
+      pollTimers.current[job.jobId] = setTimeout(() => pollVideoJob(job), 6_000);
+    } catch (err) {
+      console.error("[StoryboardClient] video poll error:", err);
+      // Network error — retry
+      pollTimers.current[job.jobId] = setTimeout(() => pollVideoJob(job), 10_000);
+    }
+  }, []);
+
+  // Start polling whenever a new video job is added
+  useEffect(() => {
+    videoJobs.forEach((job) => {
+      if (!pollTimers.current[job.jobId]) {
+        pollTimers.current[job.jobId] = setTimeout(() => pollVideoJob(job), 5_000);
+      }
+    });
+  }, [videoJobs, pollVideoJob]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimers.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  // ── Image generation ──────────────────────────────────────────────────────
+  async function handleGenerateImage(scene: NobleVideoScene, provider: "higgsfield" | "fal" = "higgsfield") {
+    setGenerating((p) => ({ ...p, [scene.id]: "image" }));
+    setErrors((p) => { const n = { ...p }; delete n[scene.id]; return n; });
 
     try {
       const res = await fetch("/api/noble/generate-image", {
@@ -34,24 +132,37 @@ export default function StoryboardClient({ project, initialScenes, characterRefs
           background: scene.background,
           reference_image_url: primaryRef?.image_url,
           aspect_ratio: project.aspect_ratio,
+          provider,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
 
-      setScenes((prev) => prev.map((s) => s.id === scene.id ? { ...s, image_url: data.image_url, status: "image_generated" } : s));
+      if (!res.ok) {
+        const raw = String(data.error ?? "Image generation failed");
+        console.error("[StoryboardClient] image failed:", raw);
+        setErrors((p) => ({ ...p, [scene.id]: { type: "image", raw } }));
+        return;
+      }
+
+      setScenes((prev) =>
+        prev.map((s) =>
+          s.id === scene.id ? { ...s, image_url: data.image_url, status: "image_generated" } : s
+        )
+      );
     } catch (err) {
-      setError((prev) => ({ ...prev, [scene.id]: String(err) }));
+      const raw = String(err);
+      console.error("[StoryboardClient] image exception:", raw);
+      setErrors((p) => ({ ...p, [scene.id]: { type: "image", raw } }));
     } finally {
-      setGenerating((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+      setGenerating((p) => { const n = { ...p }; delete n[scene.id]; return n; });
     }
   }
 
-  async function generateVideo(scene: NobleVideoScene) {
+  // ── Video generation ──────────────────────────────────────────────────────
+  async function handleGenerateVideo(scene: NobleVideoScene) {
     if (!scene.image_url) return;
-    setGenerating((prev) => ({ ...prev, [scene.id]: "video" }));
-    setError((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+    setErrors((p) => { const n = { ...p }; delete n[scene.id]; return n; });
 
     try {
       const res = await fetch("/api/noble/generate-video", {
@@ -63,25 +174,48 @@ export default function StoryboardClient({ project, initialScenes, characterRefs
           approved_image_url: scene.image_url,
           noble_action: scene.noble_action,
           camera_direction: scene.camera_direction,
-          duration: Math.ceil(project.duration_seconds / scenes.length),
+          duration: Math.max(4, Math.ceil(project.duration_seconds / scenes.length)),
           aspect_ratio: project.aspect_ratio,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
 
-      setScenes((prev) => prev.map((s) => s.id === scene.id ? { ...s, video_url: data.video_url, status: "video_generated" } : s));
+      if (!res.ok) {
+        const raw = String(data.error ?? "Video submission failed");
+        console.error("[StoryboardClient] video failed:", raw);
+        setErrors((p) => ({ ...p, [scene.id]: { type: "video", raw } }));
+        return;
+      }
+
+      if (data.queued && data.job_id) {
+        // Higgsfield async — add to polling queue
+        setVideoJobs((prev) => [
+          ...prev.filter((j) => j.sceneId !== scene.id),
+          { jobId: data.job_id, sceneId: scene.id, startedAt: Date.now() },
+        ]);
+        return;
+      }
+
+      // Synchronous provider returned a URL directly
+      if (data.video_url) {
+        setScenes((prev) =>
+          prev.map((s) =>
+            s.id === scene.id ? { ...s, video_url: data.video_url, status: "video_generated" } : s
+          )
+        );
+      }
     } catch (err) {
-      setError((prev) => ({ ...prev, [scene.id]: String(err) }));
-    } finally {
-      setGenerating((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+      const raw = String(err);
+      console.error("[StoryboardClient] video exception:", raw);
+      setErrors((p) => ({ ...p, [scene.id]: { type: "video", raw } }));
     }
   }
 
-  async function generateVoice(scene: NobleVideoScene) {
-    setGenerating((prev) => ({ ...prev, [scene.id]: "voice" }));
-    setError((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+  // ── Voice generation ──────────────────────────────────────────────────────
+  async function handleGenerateVoice(scene: NobleVideoScene) {
+    setGenerating((p) => ({ ...p, [scene.id]: "voice" }));
+    setErrors((p) => { const n = { ...p }; delete n[scene.id]; return n; });
 
     try {
       const res = await fetch("/api/noble/generate-voice", {
@@ -96,186 +230,91 @@ export default function StoryboardClient({ project, initialScenes, characterRefs
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
 
-      setScenes((prev) => prev.map((s) => s.id === scene.id ? { ...s, voice_url: data.voice_url } : s));
+      if (!res.ok) {
+        const raw = String(data.error ?? "Voice generation failed");
+        console.error("[StoryboardClient] voice failed:", raw);
+        setErrors((p) => ({ ...p, [scene.id]: { type: "voice", raw } }));
+        return;
+      }
+
+      setScenes((prev) =>
+        prev.map((s) =>
+          s.id === scene.id ? { ...s, voice_url: data.voice_url } : s
+        )
+      );
     } catch (err) {
-      setError((prev) => ({ ...prev, [scene.id]: String(err) }));
+      const raw = String(err);
+      console.error("[StoryboardClient] voice exception:", raw);
+      setErrors((p) => ({ ...p, [scene.id]: { type: "voice", raw } }));
     } finally {
-      setGenerating((prev) => { const next = { ...prev }; delete next[scene.id]; return next; });
+      setGenerating((p) => { const n = { ...p }; delete n[scene.id]; return n; });
     }
   }
 
-  async function approveScene(scene: NobleVideoScene) {
-    await fetch("/api/noble/approve-scene", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene_id: scene.id, status: "approved" }),
-    });
-    setScenes((prev) => prev.map((s) => s.id === scene.id ? { ...s, status: "approved" } : s));
+  // ── Approve scene ─────────────────────────────────────────────────────────
+  async function handleApprove(scene: NobleVideoScene) {
+    try {
+      await fetch("/api/noble/approve-scene", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene_id: scene.id, status: "approved" }),
+      });
+      setScenes((prev) =>
+        prev.map((s) => (s.id === scene.id ? { ...s, status: "approved" } : s))
+      );
+    } catch (err) {
+      console.error("[StoryboardClient] approve failed:", err);
+    }
   }
 
-  const statusBadge: Record<string, { label: string; color: string }> = {
-    pending: { label: "Pending", color: "#8899aa" },
-    image_generated: { label: "Image Ready", color: "#c9a227" },
-    video_generated: { label: "Video Ready", color: "#40916c" },
-    approved: { label: "Approved", color: "#e8c547" },
-    error: { label: "Error", color: "#ef4444" },
-  };
-
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">{project.title}</h1>
-          <p style={{ color: "#8899aa" }}>
-            {project.platform?.replace(/_/g, " ")} · {project.duration_seconds}s · {project.tone} · {project.aspect_ratio}
-          </p>
-        </div>
-        <a
-          href={`/projects/${project.id}/editor`}
-          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
-          style={{ background: "linear-gradient(135deg, #c9a227, #e8c547)", color: "#0a1628" }}
-        >
-          Final Editor →
-        </a>
-      </div>
+    <div className="flex flex-col min-h-screen" style={{ background: "#080f1e" }}>
+      <ProjectEditorHeader project={project} scenes={scenes} />
 
-      {/* Script */}
-      {project.script && (
-        <div className="rounded-2xl p-5 mb-8 border" style={{ background: "#0e1c33", borderColor: "#1a2d52" }}>
-          <h3 className="text-xs font-semibold mb-2" style={{ color: "#c9a227" }}>FULL SCRIPT</h3>
-          <p className="text-sm leading-relaxed" style={{ color: "#ccd6e0" }}>{project.script}</p>
-        </div>
-      )}
+      <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", padding: "2rem 2.5rem" }}>
 
-      {/* Scene Cards */}
-      <div className="space-y-6">
-        {scenes.map((scene) => {
-          const badge = statusBadge[scene.status] ?? statusBadge.pending;
-          const isGenerating = !!generating[scene.id];
-          const sceneError = error[scene.id];
+        {project.script && (
+          <div className="mb-6">
+            <FullScriptPanel script={project.script} />
+          </div>
+        )}
 
-          return (
-            <div key={scene.id} className="rounded-2xl overflow-hidden card-glow" style={{ background: "#0e1c33" }}>
-              <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "#132040" }}>
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: "linear-gradient(135deg, #c9a227, #e8c547)", color: "#0a1628" }}>
-                    {scene.scene_number}
-                  </span>
-                  <span className="text-sm font-semibold text-white">Scene {scene.scene_number}</span>
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ color: badge.color, background: "rgba(255,255,255,0.05)" }}>
-                  {badge.label}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 p-6">
-                {/* Scene Preview */}
-                <div>
-                  {scene.image_url ? (
-                    <div className="relative rounded-xl overflow-hidden aspect-video mb-3">
-                      <Image src={scene.image_url} alt={`Scene ${scene.scene_number}`} fill className="object-cover" />
-                    </div>
-                  ) : (
-                    <div className="rounded-xl flex items-center justify-center aspect-video mb-3" style={{ background: "#132040" }}>
-                      <span style={{ color: "#1a2d52", fontSize: "3rem" }}>🐂</span>
-                    </div>
-                  )}
-
-                  {scene.video_url && (
-                    <video
-                      src={scene.video_url}
-                      controls
-                      className="w-full rounded-xl mb-3"
-                      style={{ background: "#132040" }}
-                    />
-                  )}
-
-                  {scene.voice_url && (
-                    <audio src={scene.voice_url} controls className="w-full mb-3" />
-                  )}
-
-                  {/* Buttons */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => generateImage(scene)}
-                      disabled={isGenerating}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-                      style={{ background: "#132040", color: "#c9a227", border: "1px solid #1a2d52" }}
-                    >
-                      {generating[scene.id] === "image" ? "Generating..." : "Generate Image"}
-                    </button>
-                    <button
-                      onClick={() => generateVideo(scene)}
-                      disabled={isGenerating || !scene.image_url}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-                      style={{ background: "#132040", color: "#40916c", border: "1px solid #1a2d52" }}
-                    >
-                      {generating[scene.id] === "video" ? "Generating..." : "Generate Video"}
-                    </button>
-                    <button
-                      onClick={() => generateVoice(scene)}
-                      disabled={isGenerating}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-                      style={{ background: "#132040", color: "#8899aa", border: "1px solid #1a2d52" }}
-                    >
-                      {generating[scene.id] === "voice" ? "Recording..." : "Add Voice"}
-                    </button>
-                    <button
-                      onClick={() => approveScene(scene)}
-                      disabled={isGenerating || scene.status === "approved"}
-                      className="py-2 px-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-                      style={{
-                        background: scene.status === "approved" ? "rgba(201,162,39,0.15)" : "#132040",
-                        color: scene.status === "approved" ? "#c9a227" : "#8899aa",
-                        border: `1px solid ${scene.status === "approved" ? "#c9a227" : "#1a2d52"}`,
-                      }}
-                    >
-                      {scene.status === "approved" ? "Approved" : "Approve Scene"}
-                    </button>
-                  </div>
-
-                  {sceneError && <p className="mt-2 text-xs text-red-400">{sceneError}</p>}
-                </div>
-
-                {/* Scene Details */}
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>SCRIPT LINE</p>
-                    <p className="text-sm" style={{ color: "#ccd6e0" }}>{scene.script_line}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>CAPTION</p>
-                    <p className="text-sm" style={{ color: "#ccd6e0" }}>{scene.caption_text}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>VISUAL PROMPT</p>
-                    <p className="text-sm" style={{ color: "#8899aa" }}>{scene.visual_prompt}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>CAMERA</p>
-                      <p className="text-xs" style={{ color: "#8899aa" }}>{scene.camera_direction}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>NOBLE ACTION</p>
-                      <p className="text-xs" style={{ color: "#8899aa" }}>{scene.noble_action}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>BACKGROUND</p>
-                      <p className="text-xs" style={{ color: "#8899aa" }}>{scene.background}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold mb-1" style={{ color: "#c9a227" }}>VOICE DIRECTION</p>
-                      <p className="text-xs" style={{ color: "#8899aa" }}>{scene.voice_direction}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {scenes.length === 0 ? (
+          <div
+            className="rounded-2xl p-12 text-center"
+            style={{ background: "#0d1a2e", border: "1px solid rgba(255,255,255,0.07)" }}
+          >
+            <p className="text-base font-semibold text-white mb-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+              No scenes generated yet
+            </p>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
+              The script is ready but scenes haven&apos;t been built. Regenerate from the script panel above.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {scenes.map((scene) => {
+              const uiStatus = getUIStatus(scene, generating, errors, videoJobs);
+              const activeJob = videoJobs.find((j) => j.sceneId === scene.id);
+              return (
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  uiStatus={uiStatus}
+                  error={errors[scene.id]}
+                  videoJobId={activeJob?.jobId}
+                  videoJobStartedAt={activeJob?.startedAt}
+                  onGenerateImage={(provider) => handleGenerateImage(scene, provider)}
+                  onGenerateVideo={() => handleGenerateVideo(scene)}
+                  onGenerateVoice={() => handleGenerateVoice(scene)}
+                  onApprove={() => handleApprove(scene)}
+                  aspectRatio={project.aspect_ratio}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

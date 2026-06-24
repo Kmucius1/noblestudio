@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, voice_url: voiceUrl, scene, upload: uploadData });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const raw = String(err);
+    console.error("[generate-voice]", raw);
+    return NextResponse.json({ error: raw }, { status: 500 });
   }
 }

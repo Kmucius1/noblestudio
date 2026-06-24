@@ -24,25 +24,27 @@ export default async function ProjectsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "#080f1e" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "2.5rem 2.5rem" }}>
+
       {/* Header */}
-      <div className="px-8 pt-8 pb-6 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="flex items-center justify-between mb-8 pb-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div>
           <p className="text-xs tracking-widest uppercase mb-1" style={{ color: "#c9a227", fontFamily: "'Inter', sans-serif" }}>Noble Studio</p>
-          <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>My Projects</h1>
+          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: "'Inter', sans-serif" }}>My Projects</h1>
           <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif" }}>
             {projects?.length ?? 0} Noble video projects
           </p>
         </div>
         <Link
           href="/create"
-          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold tracking-wide"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold"
           style={{ background: "linear-gradient(135deg, #a07820, #c9a227, #e4b93a)", color: "#080f1e", fontFamily: "'Inter', sans-serif", boxShadow: "0 4px 16px rgba(201,162,39,0.3)" }}
         >
           ✦ Create New
         </Link>
       </div>
 
-      <div className="px-8 py-6 max-w-6xl">
+      <div>
         {projects && projects.length > 0 ? (
           <div className="grid grid-cols-2 gap-4">
             {projects.map((project) => {
@@ -105,6 +107,7 @@ export default async function ProjectsPage() {
             </Link>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
