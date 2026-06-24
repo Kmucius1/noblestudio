@@ -34,16 +34,16 @@ export function SceneCard({
   return (
     <div
       className="rounded-2xl overflow-hidden"
-      style={{ background: "#0d1a2e", border: "1px solid rgba(255,255,255,0.07)" }}
+      style={{ background: "#0b1929", border: "1px solid rgba(255,255,255,0.08)" }}
     >
-      {/* Card header */}
+      {/* ── Card header ── */}
       <div
-        className="flex items-center justify-between px-6 py-3.5"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        className="flex items-center justify-between px-7 py-5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <span
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
             style={{
               background: "linear-gradient(135deg, #c9a227, #e8c547)",
               color: "#0a1628",
@@ -53,7 +53,7 @@ export function SceneCard({
             {scene.scene_number}
           </span>
           <span
-            className="text-sm font-semibold text-white"
+            className="text-base font-semibold text-white"
             style={{ fontFamily: "'Inter', sans-serif" }}
           >
             Scene {scene.scene_number}
@@ -62,12 +62,12 @@ export function SceneCard({
         <StatusBadge status={uiStatus} />
       </div>
 
-      {/* Card body: left preview + right details */}
+      {/* ── Card body: left preview + right details ── */}
       <div className="flex gap-0">
-        {/* Left: preview */}
+        {/* Left: image/video preview */}
         <div
-          className="shrink-0 p-5"
-          style={{ width: 260, borderRight: "1px solid rgba(255,255,255,0.05)" }}
+          className="shrink-0 p-6"
+          style={{ width: 280, borderRight: "1px solid rgba(255,255,255,0.06)" }}
         >
           <ScenePreview
             scene={scene}
@@ -83,13 +83,13 @@ export function SceneCard({
           />
         </div>
 
-        {/* Right: details */}
-        <div className="flex-1 p-6 min-w-0">
+        {/* Right: scene details */}
+        <div className="flex-1 p-7 min-w-0">
           <SceneDetailsPanel scene={scene} />
         </div>
       </div>
 
-      {/* Action bar */}
+      {/* ── Action bar ── */}
       <SceneActionBar
         scene={scene}
         uiStatus={uiStatus}

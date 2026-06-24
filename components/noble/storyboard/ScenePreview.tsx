@@ -64,7 +64,7 @@ export function ScenePreview({
   return (
     <div className="flex flex-col gap-3">
       {/* Image / image-loading area */}
-      <div className="relative rounded-xl overflow-hidden" style={{ height: 220 }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ height: 260 }}>
         {isGeneratingImage ? (
           <div
             className="w-full h-full flex flex-col items-center justify-center gap-3"
