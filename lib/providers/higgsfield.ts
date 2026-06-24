@@ -13,7 +13,6 @@ function auth() {
   return { "Content-Type": "application/json", Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY}` };
 }
 
-// Build the full Noble prompt with Element anchor embedded
 function buildNobleImagePrompt(scene: string): string {
   return (
     `${NOBLE_ELEMENT_ANCHOR} — Noble, the EHM Strategies bull mascot. ` +
@@ -26,67 +25,117 @@ function buildNobleImagePrompt(scene: string): string {
   );
 }
 
+async function safeText(res: Response): Promise<string> {
+  const text = await res.text();
+  // If the response is HTML (Cloudflare error page, gateway timeout, etc.) return a clean message
+  if (text.trim().startsWith("<")) {
+    return `HTTP ${res.status} — Higgsfield API is temporarily unavailable. Please try again in a few minutes.`;
+  }
+  // Try to parse JSON error message
+  try {
+    const json = JSON.parse(text);
+    return json.message ?? json.error ?? json.detail ?? text.slice(0, 200);
+  } catch {
+    return text.slice(0, 200);
+  }
+}
+
 export async function generateImage(input: ImageGenerationInput): Promise<GenerationResult> {
-  // Always use Element anchor + nano_banana_2 per the commercial pipeline
   const prompt = buildNobleImagePrompt(input.prompt);
 
-  const res = await fetch(`${BASE_URL}/images/generate`, {
-    method: "POST",
-    headers: auth(),
-    body: JSON.stringify({
-      prompt,
-      negative_prompt: NOBLE_NEGATIVE_PROMPT,
-      model: NOBLE_HIGGSFIELD_MODELS.image,          // nano_banana_2
-      aspect_ratio: input.aspectRatio ?? "9:16",
-      // reference_id for Element is embedded in the prompt as <<<id>>>
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/images/generate`, {
+      method: "POST",
+      headers: auth(),
+      body: JSON.stringify({
+        prompt,
+        negative_prompt: NOBLE_NEGATIVE_PROMPT,
+        model: NOBLE_HIGGSFIELD_MODELS.image,
+        aspect_ratio: input.aspectRatio ?? "9:16",
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("timeout") || msg.includes("abort")) {
+      throw new Error("Higgsfield timed out — their API may be temporarily down. Try again in a few minutes.");
+    }
+    throw new Error(`Higgsfield connection failed: ${msg}`);
+  }
 
-  if (!res.ok) throw new Error(`Higgsfield image error: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const detail = await safeText(res);
+    throw new Error(`Higgsfield image generation failed (${res.status}): ${detail}`);
+  }
+
   const data = await res.json();
   const jobId = data.job_id ?? data.id;
   return { url: data.url ?? data.image_url ?? jobId, provider: "higgsfield", jobId };
 }
 
 export async function generateVideo(input: VideoGenerationInput): Promise<GenerationResult> {
-  // Use the locked fast model (kling3_0_turbo for ≤8s, kling3_0 for longer)
   const duration = input.duration ?? 8;
   const model = duration <= 8 ? NOBLE_HIGGSFIELD_MODELS.videoFast : NOBLE_HIGGSFIELD_MODELS.videoQuality;
 
-  const res = await fetch(`${BASE_URL}/videos/generate`, {
-    method: "POST",
-    headers: auth(),
-    body: JSON.stringify({
-      model,
-      medias: [{ role: "start_image", value: input.imageUrl }],
-      prompt: input.motionPrompt,
-      negative_prompt: NOBLE_NEGATIVE_PROMPT,
-      duration,
-      aspect_ratio: input.aspectRatio ?? "9:16",
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/videos/generate`, {
+      method: "POST",
+      headers: auth(),
+      body: JSON.stringify({
+        model,
+        medias: [{ role: "start_image", value: input.imageUrl }],
+        prompt: input.motionPrompt,
+        negative_prompt: NOBLE_NEGATIVE_PROMPT,
+        duration,
+        aspect_ratio: input.aspectRatio ?? "9:16",
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("timeout") || msg.includes("abort")) {
+      throw new Error("Higgsfield timed out — their API may be temporarily down. Try again in a few minutes.");
+    }
+    throw new Error(`Higgsfield connection failed: ${msg}`);
+  }
 
-  if (!res.ok) throw new Error(`Higgsfield video error: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const detail = await safeText(res);
+    throw new Error(`Higgsfield video generation failed (${res.status}): ${detail}`);
+  }
+
   const data = await res.json();
   const jobId = data.job_id ?? data.id;
   return { url: data.url ?? data.video_url ?? jobId, provider: "higgsfield", jobId };
 }
 
-// Hero portrait via Soul V2 — use when face fidelity is critical
 export async function generateSoulPortrait(scene: string, aspectRatio = "9:16"): Promise<GenerationResult> {
-  const res = await fetch(`${BASE_URL}/images/generate`, {
-    method: "POST",
-    headers: auth(),
-    body: JSON.stringify({
-      prompt: `Noble the EHM Strategies bull executive, ${scene}, confident composed pose, navy/emerald/gold palette, cinematic rim light, premium finance brand.`,
-      negative_prompt: NOBLE_NEGATIVE_PROMPT,
-      model: NOBLE_HIGGSFIELD_MODELS.soulPortrait,   // soul_2
-      soul_id: NOBLE_HIGGSFIELD_IDS.soulV2,          // 8a167e9a-...
-      aspect_ratio: aspectRatio,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/images/generate`, {
+      method: "POST",
+      headers: auth(),
+      body: JSON.stringify({
+        prompt: `Noble the EHM Strategies bull executive, ${scene}, confident composed pose, navy/emerald/gold palette, cinematic rim light, premium finance brand.`,
+        negative_prompt: NOBLE_NEGATIVE_PROMPT,
+        model: NOBLE_HIGGSFIELD_MODELS.soulPortrait,
+        soul_id: NOBLE_HIGGSFIELD_IDS.soulV2,
+        aspect_ratio: aspectRatio,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Higgsfield connection failed: ${msg}`);
+  }
 
-  if (!res.ok) throw new Error(`Higgsfield soul error: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const detail = await safeText(res);
+    throw new Error(`Higgsfield soul portrait failed (${res.status}): ${detail}`);
+  }
+
   const data = await res.json();
   return { url: data.url ?? data.image_url, provider: "higgsfield" };
 }
