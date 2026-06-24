@@ -18,19 +18,15 @@ export default async function DashboardPage() {
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
-          setAll: (cookiesToSet) => {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {}
+          setAll: (list) => {
+            try { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
           },
         },
       }
     );
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) console.error("[Dashboard] auth error:", authError.message);
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr) console.error("[Dashboard] auth error:", authErr.message);
     user = authData?.user ?? null;
 
     if (user) {
@@ -40,20 +36,18 @@ export default async function DashboardPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(4);
-      if (pErr) console.error("[Dashboard] projects query error:", pErr.message, pErr.code);
+      if (pErr) console.error("[Dashboard] projects query:", pErr.message, pErr.code);
       projects = p ?? [];
 
-      const { count: pc, error: pcErr } = await supabase
+      const { count: pc } = await supabase
         .from("noble_video_projects")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
-      if (pcErr) console.error("[Dashboard] project count error:", pcErr.message);
       totalProjects = pc ?? 0;
 
-      const { count: ec, error: ecErr } = await supabase
+      const { count: ec } = await supabase
         .from("noble_exports")
         .select("*", { count: "exact", head: true });
-      if (ecErr) console.error("[Dashboard] exports count error:", ecErr.message);
       totalExports = ec ?? 0;
     }
   } catch (err) {
@@ -68,7 +62,7 @@ export default async function DashboardPage() {
     { label: "AI Provider", value: "Groq", icon: "✦", sub: "free · Llama 3.3" },
   ];
 
-  const statusColors: Record<string, string> = {
+  const statusColor: Record<string, string> = {
     draft: "rgba(255,255,255,0.3)",
     scripted: "#c9a227",
     storyboarded: "#40916c",
@@ -97,7 +91,7 @@ export default async function DashboardPage() {
             </p>
             <Link
               href="/create"
-              className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase"
+              className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl text-xs font-bold"
               style={{ background: "linear-gradient(135deg, #a07820, #c9a227, #e4b93a)", color: "#080f1e", fontFamily: "'Inter', sans-serif", letterSpacing: "0.1em", boxShadow: "0 4px 16px rgba(201,162,39,0.35)" }}
             >
               ✦ Create New Video
@@ -135,16 +129,14 @@ export default async function DashboardPage() {
                 <Link
                   key={a.href}
                   href={a.href}
-                  className="flex items-center justify-between p-4 rounded-xl group transition-all"
-                  style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
+                  className="noble-card flex items-center justify-between p-4 rounded-xl"
+                  style={{ background: "#0d1628" }}
                 >
                   <div>
                     <p className="text-sm font-semibold text-white" style={{ fontFamily: "'Inter', sans-serif" }}>{a.label}</p>
                     <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>{a.desc}</p>
                   </div>
-                  <span className="text-sm" style={{ color: "#c9a227" }}>→</span>
+                  <span className="text-sm shrink-0 ml-4" style={{ color: "#c9a227" }}>→</span>
                 </Link>
               ))}
             </div>
@@ -163,10 +155,8 @@ export default async function DashboardPage() {
                   <Link
                     key={project.id as string}
                     href={`/projects/${project.id}/storyboard`}
-                    className="flex items-center gap-4 p-4 rounded-xl group transition-all"
-                    style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
+                    className="noble-card flex items-center gap-4 p-4 rounded-xl"
+                    style={{ background: "#0d1628" }}
                   >
                     <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)", border: "1px solid rgba(201,162,39,0.2)" }}>
                       <span className="text-sm" style={{ color: "#c9a227" }}>◈</span>
@@ -180,7 +170,7 @@ export default async function DashboardPage() {
                       </p>
                     </div>
                     <span className="text-xs px-2.5 py-1 rounded-full font-semibold shrink-0" style={{
-                      color: statusColors[project.status as string] ?? "rgba(255,255,255,0.3)",
+                      color: statusColor[project.status as string] ?? "rgba(255,255,255,0.3)",
                       background: "rgba(255,255,255,0.05)",
                       fontFamily: "'Inter', sans-serif",
                     }}>
@@ -196,8 +186,8 @@ export default async function DashboardPage() {
                 </div>
                 <p className="text-base font-bold text-white mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>No projects yet</p>
                 <p className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>Create your first Noble video to get started</p>
-                <Link href="/create" className="inline-block px-5 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase"
-                  style={{ background: "linear-gradient(135deg, #a07820, #c9a227)", color: "#080f1e", fontFamily: "'Inter', sans-serif", letterSpacing: "0.1em" }}>
+                <Link href="/create" className="inline-block px-5 py-2.5 rounded-xl text-xs font-bold"
+                  style={{ background: "linear-gradient(135deg, #a07820, #c9a227)", color: "#080f1e", fontFamily: "'Inter', sans-serif" }}>
                   Create First Video
                 </Link>
               </div>

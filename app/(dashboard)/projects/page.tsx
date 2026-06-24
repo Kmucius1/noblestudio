@@ -51,10 +51,8 @@ export default async function ProjectsPage() {
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}/storyboard`}
-                  className="group rounded-2xl p-5 transition-all"
-                  style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
+                  className="noble-card rounded-2xl p-5"
+                  style={{ background: "#0d1628" }}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -83,7 +81,7 @@ export default async function ProjectsPage() {
                       <span>·</span>
                       <span>{project.aspect_ratio}</span>
                     </div>
-                    <span className="text-xs transition-transform group-hover:translate-x-0.5" style={{ color: "#c9a227" }}>→</span>
+                    <span className="text-xs" style={{ color: "#c9a227" }}>→</span>
                   </div>
                 </Link>
               );

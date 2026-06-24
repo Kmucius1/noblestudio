@@ -97,6 +97,15 @@ h1, h2, h3, .font-display { font-family: 'Playfair Display', Georgia, serif; }
   opacity: 0.4;
 }
 
+/* Server-component hover cards — no JS event handlers needed */
+.noble-card {
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: border-color 0.15s ease;
+}
+.noble-card:hover {
+  border-color: rgba(201,162,39,0.25);
+}
+
 /* ── Buttons ── */
 .btn-gold {
   background: linear-gradient(135deg, #a07820, #c9a227, #e4b93a);
