@@ -351,10 +351,8 @@ export default async function DashboardPage() {
                 <Link
                   key={i}
                   href={action.href}
-                  className="flex items-center gap-3 p-4 rounded-2xl group transition-all"
-                  style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
+                  className="flex items-center gap-3 p-4 rounded-2xl group transition-all border border-[rgba(255,255,255,0.06)] hover:border-[rgba(201,162,39,0.25)]"
+                  style={{ background: "#0d1628" }}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -407,10 +405,8 @@ export default async function DashboardPage() {
                   <Link
                     key={project.id as string}
                     href={`/projects/${project.id}/storyboard`}
-                    className="group flex flex-col rounded-2xl overflow-hidden transition-all"
-                    style={{ background: "#0d1628", border: "1px solid rgba(255,255,255,0.06)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(201,162,39,0.25)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
+                    className="group flex flex-col rounded-2xl overflow-hidden transition-all border border-[rgba(255,255,255,0.06)] hover:border-[rgba(201,162,39,0.25)]"
+                    style={{ background: "#0d1628" }}
                   >
                     {/* Thumbnail */}
                     <div className="relative" style={{ height: 120 }}>
