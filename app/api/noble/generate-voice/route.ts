@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { authorizeOwnedScene } from "@/lib/noble/authorization";
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 
@@ -7,6 +8,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { scene_id, project_id, script_line, voice_id, tone = "warm" } = body;
+
+    if (!scene_id || !project_id || !script_line) {
+      return NextResponse.json(
+        { error: "scene_id, project_id, and script_line are required" },
+        { status: 400 },
+      );
+    }
+
+    const access = await authorizeOwnedScene(scene_id, project_id);
+    if (access.response) return access.response;
 
     const nobleVoiceId = voice_id || process.env.ELEVENLABS_NOBLE_VOICE_ID;
     if (!nobleVoiceId) throw new Error("No Noble voice ID configured");
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
       .from("noble_video_scenes")
       .update({ voice_url: voiceUrl })
       .eq("id", scene_id)
+      .eq("project_id", project_id)
       .select()
       .single();
 
