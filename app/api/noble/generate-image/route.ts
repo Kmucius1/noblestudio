@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { generateImage } from "@/lib/providers";
 import { buildImagePrompt } from "@/lib/noble/prompts";
 import { NOBLE_NEGATIVE_PROMPT } from "@/lib/noble/character-bible";
+import { authorizeOwnedScene } from "@/lib/noble/authorization";
 import type { ImageProvider } from "@/lib/providers";
 
 // Images take 10–25s to generate + poll; 60s gives safe headroom
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
     if (!scene_id || !project_id) {
       return NextResponse.json({ error: "scene_id and project_id are required" }, { status: 400 });
     }
+
+    const access = await authorizeOwnedScene(scene_id, project_id);
+    if (access.response) return access.response;
 
     const fullPrompt = buildImagePrompt({
       sceneDescription: visual_prompt ?? "",
@@ -52,6 +56,7 @@ export async function POST(req: NextRequest) {
       .from("noble_video_scenes")
       .update({ image_url: result.url, status: "image_generated" })
       .eq("id", scene_id)
+      .eq("project_id", project_id)
       .select()
       .single();
 
