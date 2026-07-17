@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildScriptPrompt } from "@/lib/noble/prompts";
+import { authorizeOwnedProject } from "@/lib/noble/authorization";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY ?? "placeholder" });
 
@@ -9,6 +10,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { project_id, goal, platform, duration_seconds, tone, location, cta, custom_prompt } = body;
+
+    if (!project_id) {
+      return NextResponse.json({ error: "project_id is required" }, { status: 400 });
+    }
+
+    const access = await authorizeOwnedProject(project_id);
+    if (access.response) return access.response;
 
     const userRequest = custom_prompt || `Create a ${goal.replace(/_/g, " ")} video for ${location?.replace(/_/g, " ") || "luxury office"} setting.`;
 
@@ -39,7 +47,8 @@ export async function POST(req: NextRequest) {
     await supabase
       .from("noble_video_projects")
       .update({ title: generated.title, script: generated.script, status: "scripted" })
-      .eq("id", project_id);
+      .eq("id", project_id)
+      .eq("user_id", access.user!.id);
 
     const scenes = generated.scenes.map((s: Record<string, unknown>) => ({
       project_id,
