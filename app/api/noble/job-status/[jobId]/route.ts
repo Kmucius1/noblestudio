@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { checkJobStatus } from "@/lib/providers";
+import { authorizeOwnedScene } from "@/lib/noble/authorization";
 
 export const maxDuration = 20;
 
@@ -20,9 +21,15 @@ export async function GET(
   const sceneId = searchParams.get("scene_id");
   const assetType = (searchParams.get("type") ?? "video") as "video" | "image";
 
-  if (!jobId) {
-    return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+  if (!jobId || !sceneId) {
+    return NextResponse.json(
+      { error: "jobId and scene_id are required" },
+      { status: 400 },
+    );
   }
+
+  const access = await authorizeOwnedScene(sceneId);
+  if (access.response) return access.response;
 
   const result = await checkJobStatus(jobId);
 
@@ -37,7 +44,8 @@ export async function GET(
       await supabase
         .from("noble_video_scenes")
         .update(updateField)
-        .eq("id", sceneId);
+        .eq("id", sceneId)
+        .eq("project_id", access.scene!.project_id);
 
       console.log(`[job-status] ${assetType} saved to scene ${sceneId}: ${result.url}`);
     } catch (dbErr) {
