@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateVideo } from "@/lib/providers";
 import { buildVideoPrompt } from "@/lib/noble/prompts";
+import { authorizeOwnedScene } from "@/lib/noble/authorization";
 import type { VideoProvider } from "@/lib/providers";
 
 // Just submits the job — fast, no polling needed
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
     if (!scene_id || !project_id) {
       return NextResponse.json({ error: "scene_id and project_id are required" }, { status: 400 });
     }
+
+    const access = await authorizeOwnedScene(scene_id, project_id);
+    if (access.response) return access.response;
 
     if (!approved_image_url) {
       return NextResponse.json(
